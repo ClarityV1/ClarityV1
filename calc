@@ -1,0 +1,125 @@
+import React, { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
+
+export default function TradingDashboard() {
+  const [accountSize, setAccountSize] = useState('');
+  const [riskPercent, setRiskPercent] = useState('');
+  const [entryPrice, setEntryPrice] = useState('');
+  const [stopLossPrice, setStopLossPrice] = useState('');
+  const [targetPrice, setTargetPrice] = useState('');
+  const [positionSize, setPositionSize] = useState(null);
+  const [riskReward, setRiskReward] = useState(null);
+  const [journal, setJournal] = useState([]);
+  const [notes, setNotes] = useState('');
+
+  const [equityCurve, setEquityCurve] = useState([{ trade: 0, equity: 10000 }]);
+
+  const calculatePositionSize = () => {
+    const account = parseFloat(accountSize);
+    const risk = parseFloat(riskPercent) / 100;
+    const entry = parseFloat(entryPrice);
+    const stop = parseFloat(stopLossPrice);
+    const target = parseFloat(targetPrice);
+    const riskPerShare = Math.abs(entry - stop);
+
+    if (!account || !risk || !entry || !stop || riskPerShare === 0) {
+      setPositionSize(null);
+      setRiskReward(null);
+      return;
+    }
+
+    const dollarRisk = account * risk;
+    const shares = Math.floor(dollarRisk / riskPerShare);
+    setPositionSize(shares);
+
+    if (target) {
+      const rr = Math.abs(target - entry) / riskPerShare;
+      setRiskReward(rr.toFixed(2));
+    }
+  };
+
+  const logTrade = () => {
+    if (positionSize !== null) {
+      const last = equityCurve[equityCurve.length - 1].equity;
+      const profitLoss = (parseFloat(targetPrice) - parseFloat(entryPrice)) * positionSize;
+      const newEquity = last + profitLoss;
+
+      const newEntry = {
+        entryPrice,
+        stopLossPrice,
+        targetPrice,
+        positionSize,
+        riskReward,
+        notes,
+        result: profitLoss,
+        equity: newEquity
+      };
+
+      setJournal([...journal, newEntry]);
+      setEquityCurve([...equityCurve, { trade: journal.length + 1, equity: newEquity }]);
+      setNotes('');
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto mt-10 space-y-10">
+      <Card className="p-4 shadow-xl">
+        <CardContent className="space-y-4">
+          <h2 className="text-xl font-bold">Risk & Position Size Calculator</h2>
+          <Input type="number" placeholder="Account Size ($)" value={accountSize} onChange={(e) => setAccountSize(e.target.value)} />
+          <Input type="number" placeholder="Risk % per trade" value={riskPercent} onChange={(e) => setRiskPercent(e.target.value)} />
+          <Input type="number" placeholder="Entry Price ($)" value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} />
+          <Input type="number" placeholder="Stop Loss Price ($)" value={stopLossPrice} onChange={(e) => setStopLossPrice(e.target.value)} />
+          <Input type="number" placeholder="Target Price ($)" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} />
+          <Button onClick={calculatePositionSize}>Calculate</Button>
+          {positionSize !== null && (
+            <div className="text-lg font-semibold space-y-1">
+              <div>Max Shares to Buy: {positionSize}</div>
+              {riskReward && <div>Risk:Reward Ratio: {riskReward}</div>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="p-4 shadow-xl">
+        <CardContent className="space-y-4">
+          <h2 className="text-xl font-bold">Trade Journal</h2>
+          <Textarea placeholder="Trade notes, psychology, setup, etc." value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <Button onClick={logTrade}>Log Trade</Button>
+          <div className="space-y-2">
+            {journal.map((t, i) => (
+              <div key={i} className="border rounded-xl p-2">
+                <div><strong>Trade #{i + 1}</strong> | Entry: ${t.entryPrice} | Stop: ${t.stopLossPrice} | Target: ${t.targetPrice}</div>
+                <div>Shares: {t.positionSize} | R:R: {t.riskReward}</div>
+                <div>P/L: ${t.result.toFixed(2)} | Equity: ${t.equity.toFixed(2)}</div>
+                <div>Notes: {t.notes}</div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="p-4 shadow-xl">
+        <CardContent className="space-y-4">
+          <h2 className="text-xl font-bold">Equity Curve</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={equityCurve}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="trade" label={{ value: 'Trade #', position: 'insideBottomRight', offset: -5 }} />
+              <YAxis label={{ value: 'Equity ($)', angle: -90, position: 'insideLeft' }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="equity" stroke="#3b82f6" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+					
+					
